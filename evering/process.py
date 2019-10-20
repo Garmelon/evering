@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import shutil
 from pathlib import Path
@@ -7,6 +8,7 @@ from .colors import *
 from .config import *
 from .known_files import *
 from .parser import *
+from .prompt import *
 from .util import *
 
 __all__ = ["Processor"]
@@ -29,13 +31,13 @@ class Processor:
             self._process_file_with_header(path, header_path, config)
 
     def _process_file_without_header(self, path: Path, config: Config) -> None:
-        logger.debug(f"Processing file {style_path(path)} with no header")
+        logger.debug(f"Processing file {style_path(path)} without header")
 
         try:
             text = read_file(path)
         except ReadFileException as e:
             raise LessCatastrophicError(
-                style_error("Could not load file ") +
+                style_error("Could not read file ") +
                 style_path(path) + f": {e}")
 
         header, lines = split_header_and_rest(text)
@@ -83,14 +85,24 @@ class Processor:
         for target in config.targets:
             logger.info(f"  -> {style_path(str(target))}")
 
+            if not self._justify_target(target):
+                logger.info("Skipping this target")
+                continue
+
             try:
                 shutil.copy(path, target)
             except (IOError, shutil.SameFileError) as e:
                 logger.warning(style_warning("Could not copy") + f": {e}")
 
+            self._update_known_hash(target)
+
     def _process_parseable(self, lines: List[str], config: Config) -> None:
         for target in config.targets:
             logger.info(f"  -> {style_path(str(target))}")
+
+            if not self._justify_target(target):
+                logger.info("Skipping this target")
+                continue
 
             config_copy = config.copy()
             config_copy.target = target
@@ -117,3 +129,65 @@ class Processor:
             except WriteFileException as e:
                 logger.warning(style_warning("Could not write to ") + style_path(str(target)) +
                             f": {e}")
+                continue
+
+            self._update_known_hash(target)
+
+    def _obtain_hash(self, path: Path) -> Optional[str]:
+        BLOCK_SIZE = 2**16
+
+        try:
+            h = hashlib.sha256()
+
+            with open(path, "rb") as f:
+                while True:
+                    block = f.read(BLOCK_SIZE)
+                    if not block: break
+                    h.update(block)
+
+            return h.hexdigest()
+
+        except IOError:
+            return None
+
+    def _justify_target(self, target: Path) -> bool:
+        if not target.exists():
+            return True
+
+        if not target.is_file():
+            logger.warning(style_warning("The target is a directory"))
+            return False
+
+        target_hash = self._obtain_hash(target)
+        if target_hash is None:
+            return prompt_yes_no("Overwriting a file that could not be hashed, continue?", False)
+
+        if self.known_files.was_recently_modified(target):
+            logger.warning(style_warning("This target was already overwritten earlier"))
+            return False
+
+        known_target_hash = self.known_files.get_hash(target)
+        if known_target_hash is None:
+            return prompt_yes_no("Overwriting an unknown file, continue?", False)
+
+        # The following condition is phrased awkwardly because I just
+        # feel better if the final statement in this function is not a
+        # 'return True'. After all, returning True here might cause
+        # loss of important configuration data.
+
+        if target_hash == known_target_hash:
+            # We're positive that this file hasn't changed since we've
+            # last seen it.
+            return True
+
+        return prompt_yes_no("Overwriting a file that was modified since it was last overwritten, continue?", False)
+
+    def _update_known_hash(self, target: Path) -> None:
+        target_hash = self._obtain_hash(target)
+        if target_hash is None:
+            raise LessCatastrophicError(
+                style_error("Could not obtain hash of target file ") +
+                style_path(target))
+
+        self.known_files.update_file(target, target_hash)
+        self.known_files.save_incremental()

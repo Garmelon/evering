@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from .colors import *
 from .util import *
@@ -22,6 +22,9 @@ class KnownFiles:
             logger.debug(f"File {style_path(self._path)} does not exist, "
                          "creating a new file on the first upcoming save")
 
+    def _normalize_path(self, path: Path) -> Path:
+        return path.expanduser().resolve()
+
     def _read_known_files(self, text: str) -> Dict[Path, str]:
         known_files: Dict[Path, str] = {}
         raw_known_files = json.loads(text)
@@ -35,13 +38,26 @@ class KnownFiles:
             if not isinstance(file_hash, str):
                 raise CatastrophicError(style_error(f"Hash {hash!r} at path {path!r} is not a string"))
 
-            path = Path(path).expanduser().resolve() # normalized
+            path = self._normalize_path(Path(path))
             known_files[path] = file_hash
 
         return known_files
 
+    def was_recently_modified(self, path: Path) -> bool:
+        return self._normalize_path(path) in self._new_known_files
+
+    def get_hash(self, path: Path) -> Optional[str]:
+        path = self._normalize_path(path)
+
+        h = self._new_known_files.get(path)
+
+        if h is None:
+            h = self._old_known_files.get(path)
+
+        return h
+
     def update_file(self, path: Path, file_hash: str) -> None:
-        self._new_known_files[path.expanduser().resolve()] = file_hash
+        self._new_known_files[self._normalize_path(path)] = file_hash
 
     def save_incremental(self) -> None:
         to_save: Dict[str, str] = {}
@@ -54,7 +70,12 @@ class KnownFiles:
         self._save(json.dumps(to_save))
         logger.debug(f"Incremental save to {style_path(self._path)} completed")
 
-    def find_lost_files(self) -> Set[Path]:
+    def find_forgotten_files(self) -> Set[Path]:
+        """
+        Finds all files which were not modified this round and thus
+        are no longer known (i. e. have been forgotten).
+        """
+
         return set(self._old_known_files.keys() - self._new_known_files.keys())
 
     def save_final(self) -> None:

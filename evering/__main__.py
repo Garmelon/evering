@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from .colors import *
 from .config import *
 from .explore import *
 from .known_files import *
@@ -74,6 +75,11 @@ def run(args: Any) -> None:
 
             if prompt_choice("[C]ontinue to the next file or [A]bort the program?", "Ca") == "a":
                 raise CatastrophicError("Aborted")
+
+    for path in known_files.find_forgotten_files():
+        logger.info(f"The file {style_path(path)} is no longer known")
+
+    known_files.save_final()
 
 def main() -> None:
     parser = argparse.ArgumentParser()
