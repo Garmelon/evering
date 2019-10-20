@@ -49,7 +49,7 @@ class Processor:
                 style_error("Could not parse header of file ") +
                 style_path(path) + f": {e}")
 
-        self._process_parseable(lines, config)
+        self._process_parseable(lines, config, path)
 
     def _process_file_with_header(self, path: Path, header_path: Path, config: Config) -> None:
         logger.debug(f"Processing file {style_path(path)} "
@@ -77,7 +77,7 @@ class Processor:
                     style_error("Could not load file ") +
                     style_path(path) + f": {e}")
 
-            self._process_parseable(lines, config)
+            self._process_parseable(lines, config, path)
 
     def _process_binary(self, path: Path, config: Config) -> None:
         logger.debug(f"Processing as a binary file")
@@ -90,13 +90,25 @@ class Processor:
                 continue
 
             try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+            except IOError as e:
+                logger.warning(style_warning("Could not create target directory") + f": {e}")
+                continue
+
+            try:
                 shutil.copy(path, target)
             except (IOError, shutil.SameFileError) as e:
                 logger.warning(style_warning("Could not copy") + f": {e}")
+                continue
+
+            try:
+                shutil.copymode(path, target)
+            except shutil.Error as e:
+                logger.warning(style_warning("Could not copy permissions") + f": {e}")
 
             self._update_known_hash(target)
 
-    def _process_parseable(self, lines: List[str], config: Config) -> None:
+    def _process_parseable(self, lines: List[str], config: Config, source: Path) -> None:
         for target in config.targets:
             logger.info(f"  -> {style_path(str(target))}")
 
@@ -114,22 +126,34 @@ class Processor:
                     expression_prefix=config.expression_delimiters[0],
                     expression_suffix=config.expression_delimiters[1],
                 )
-                text = parser.evaluate(config_copy.local_vars)
             except ParseException as e:
                 logger.warning(style_warning("Could not parse ") +
                                style_path(target) + f": {e}")
                 continue
+
+            try:
+                text = parser.evaluate(config_copy.local_vars)
             except ExecuteException as e:
                 logger.warning(style_warning("Could not compile ") +
                                style_path(target) + f": {e}")
                 continue
 
             try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+            except IOError as e:
+                logger.warning(style_warning("Could not create target directory") + f": {e}")
+                continue
+
+            try:
                 write_file(target, text)
             except WriteFileException as e:
-                logger.warning(style_warning("Could not write to ") + style_path(str(target)) +
-                            f": {e}")
+                logger.warning(style_warning("Could not write to target") + f": {e}")
                 continue
+
+            try:
+                shutil.copymode(source, target)
+            except shutil.Error as e:
+                logger.warning(style_warning("Could not copy permissions") + f": {e}")
 
             self._update_known_hash(target)
 
