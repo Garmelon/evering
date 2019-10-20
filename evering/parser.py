@@ -13,12 +13,10 @@ This parsing solution has the following structure:
 5. Evaluate the blocks recursively
 """
 
-__all__ = ["ParseException", "Parser"]
-
-class ParseException(Exception):
-    @classmethod
-    def on_line(cls, line: "Line", text: str) -> "ParseException":
-        return ParseException(f"Line {line.line_number}: {text}")
+__all__ = [
+    "split_header_and_rest",
+    "ParseException", "Parser",
+]
 
 def split_header_and_rest(text: str) -> Tuple[List[str], List[str]]:
     lines = text.splitlines()
@@ -40,20 +38,25 @@ def split_header_and_rest(text: str) -> Tuple[List[str], List[str]]:
 
     return header, rest
 
+class ParseException(Exception):
+    @classmethod
+    def on_line(cls, line: "Line", text: str) -> "ParseException":
+        return ParseException(f"Line {line.line_number}: {text}")
+
 class Parser:
     def __init__(self,
                  raw_lines: List[str],
-                 statement_initiator: str,
-                 expression_opening_delimiter: str,
-                 expression_closing_delimiter: str,
+                 statement_prefix: str,
+                 expression_prefix: str,
+                 expression_suffix: str,
     ) -> None:
         """
         May raise: ParseException
         """
         
-        self.statement_initiator = statement_initiator
-        self.expression_opening_delimiter = expression_opening_delimiter
-        self.expression_closing_delimiter = expression_closing_delimiter
+        self.statement_prefix = statement_prefix
+        self.expression_prefix = expression_prefix
+        self.expression_suffix = expression_suffix
 
         # Split up the text into lines and parse those
         lines: List[Line] = []
@@ -89,7 +92,7 @@ class Line(ABC):
             pass
 
         try:
-            return EndStatement(parser, text, line_number)
+            return EndifStatement(parser, text, line_number)
         except ParseException:
             pass
 
@@ -100,7 +103,7 @@ class Line(ABC):
         self.line_number = line_number
 
     def _parse_statement(self, text: str, statement_name: str) -> Optional[str]:
-        start = f"{self.parser.statement_initiator} {statement_name}"
+        start = f"{self.parser.statement_prefix} {statement_name}"
         text = text.strip()
         if text.startswith(start):
             return text[len(start):].strip()
@@ -108,7 +111,7 @@ class Line(ABC):
             return None
 
     def _parse_statement_noarg(self, text: str, statement_name: str) -> bool:
-        return text.strip() == f"{self.parser.statement_initiator} {statement_name}"
+        return text.strip() == f"{self.parser.statement_prefix} {statement_name}"
     
 class ActualLine(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
@@ -136,18 +139,18 @@ class ActualLine(Line):
 
         i = 0
         while i < len(text):
-            # Find opening delimiter
-            od = text.find(self.parser.expression_opening_delimiter, i)
+            # Find expression prefix
+            od = text.find(self.parser.expression_prefix, i)
             if od == -1:
                 chunks.append((text[i:], False))
                 break # We've consumed the entire string.
-            od_end = od + len(self.parser.expression_opening_delimiter)
+            od_end = od + len(self.parser.expression_prefix)
 
-            # Find closing delimiter
-            cd = text.find(self.parser.expression_closing_delimiter, od_end)
+            # Find expression suffix
+            cd = text.find(self.parser.expression_suffix, od_end)
             if cd == -1:
-                raise ParseException.on_line(self, f"No closing delimiter\n{text[:od_end]} <-- to THIS opening delimiter")
-            cd_end = cd + len(self.parser.expression_closing_delimiter)
+                raise ParseException.on_line(self, f"No matching expression suffix\n{text[:od_end]} <-- to THIS expression prefix")
+            cd_end = cd + len(self.parser.expression_suffix)
 
             # Split up into chunks
             chunks.append((text[i:od], False))
@@ -211,7 +214,7 @@ class ElseStatement(Line):
         if not self._parse_statement_noarg(text, "else"):
             raise ParseException.on_line(self, "Not an 'else' statement")
 
-class EndStatement(Line):
+class EndifStatement(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
         """
         May raise: ParseException
@@ -219,8 +222,8 @@ class EndStatement(Line):
 
         super().__init__(parser, line_number)
 
-        if not self._parse_statement_noarg(text, "end"):
-            raise ParseException.on_line(self, "Not an 'end' statement")
+        if not self._parse_statement_noarg(text, "endif"):
+            raise ParseException.on_line(self, "Not an 'endif' statement")
 
 # Block parsing
 
@@ -302,7 +305,7 @@ class IfBlock(Block):
 
         if not lines_queue:
             raise ParseException("Unexpected end of file, expected 'if' statement")
-        if not isinstance(lines_queue[-1], EndStatement):
+        if not isinstance(lines_queue[-1], EndifStatement):
             raise ParseException.on_line(lines_queue[-1], "Expected 'end' statement")
         lines_queue.pop()
         

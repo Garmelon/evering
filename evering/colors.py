@@ -3,8 +3,9 @@ This module includes functions to color the console output with ANSI
 escape sequences.
 """
 
-from typing import Optional, Tuple
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
 __all__ = [
     "CSI", "ERASE_LINE",
@@ -12,6 +13,7 @@ __all__ = [
     "Color",
     "BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE", "BRIGHT_BLACK", "BRIGHT_RED", "BRIGHT_GREEN", "BRIGHT_YELLOW", "BRIGHT_BLUE", "BRIGHT_MAGENTA", "BRIGHT_CYAN", "BRIGHT_WHITE",
     "style_sequence", "styled",
+    "style_path", "style_var", "style_error", "style_warning",
 ]
 
 # ANSI escape sequences
@@ -61,3 +63,17 @@ def styled(text: str, *args: int) -> str:
         return f"{sequence}{text}{reset}"
     else:
         return text # No styling necessary
+
+def style_path(path: Union[str, Path]) -> str:
+    if isinstance(path, Path):
+        path = str(path)
+    return styled(path, BRIGHT_BLACK.fg, BOLD)
+
+def style_var(text: str) -> str:
+    return styled(repr(text), BLUE.fg)
+
+def style_error(text: str) -> str:
+    return styled(text, RED.fg, BOLD)
+
+def style_warning(text: str) -> str:
+    return styled(text, YELLOW.fg, BOLD)

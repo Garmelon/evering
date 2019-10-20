@@ -1,48 +1,90 @@
 import argparse
-from pathlib import Path
-from typing import Union
 import logging
+from pathlib import Path
+from typing import Any
+from .config import *
+from .known_files import *
+from .process import *
+from .util import *
+from .explore import *
+from .prompt import *
 
-from .colors import *
-
-logging.basicConfig(level=logging.DEBUG, style="{", format="{levelname:>7}: {message}")
+#logging.basicConfig(level=logging.DEBUG, style="{", format="{levelname:>7}: {message}")
+logging.basicConfig(level=logging.INFO, style="{", format="{levelname:>7}: {message}")
 logger = logging.getLogger(__name__)
 
+HEADER_FILE_SUFFIX = ".evering-header"
+
+"""
+(error) -> CatastrophicError
+(warning) -> log message
+(skip/abort) -> LessCatastrophicError
+
+- Load config
+  - no readable config file found (error)
+  - config file can't be found (error)
+  - config file can't be opened (error)
+  - config file contains invalid syntax (error)
+
+- Load known files
+  - known_files can't be read (error)
+  - known_files contains invalid syntax (error)
+  - known_files contains invalid data (error)
 
 
+- Locate config files + header files
+  - missing permissions to view folders (warning)
+  - header file but no corresponding file (warning)
 
-def command_test_func(args):
-    logger.debug(styled("Debug", BLUE.fg, BOLD))
-    logger.info(styled("Info", GREEN.fg, BOLD))
-    logger.warning(styled("Warning", YELLOW.fg, BOLD))
-    logger.error(styled("Error", RED.fg, BOLD))
-    logger.info(styled("Test", BRIGHT_BLACK.fg, BOLD))
+- Process files
 
 
+Processing files
+================
 
+Header problems:
+- header file can't be read (skip/abort)
+- invalid header syntax (skip/abort)
 
+Config file problems:
+- file can't be read (skip/abort)
+- file contains no lines (warning)
+- invalid config file syntax (skip/abort)
+- error while compiling (skip/abort)
 
+Writing problems:
+- no targets (skip/abort)
+- can't write/copy to target (warning)
+- can't write to known files (error)
+"""
 
+def run(args: Any) -> None:
+    config = Config.load_config_file(args.config_file and Path(args.config_file) or None)
+    known_files = KnownFiles(config.known_files)
 
+    processor = Processor(config, known_files)
+    config_files = find_config_files(config.config_dir)
 
+    for file_info in config_files:
+        try:
+            processor.process_file(file_info.path, file_info.header)
+        except LessCatastrophicError as e:
+            logger.error(e)
 
+            if prompt_choice("[C]ontinue to the next file or [A]bort the program?", "Ca") == "a":
+                raise CatastrophicError("Aborted")
 
-
-
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config-file")
-    subparsers = parser.add_subparsers(title="commands")
-
-    command_test = subparsers.add_parser("test")
-    command_test.set_defaults(func=command_test_func)
-    command_test.add_argument("some_file")
 
     args = parser.parse_args()
-    if "func" in args:
-        args.func(args)
-    else:
-        parser.print_help()
+    try:
+        run(args)
+    except CatastrophicError as e:
+        logger.error(e)
+    except ConfigurationException as e:
+        logger.error(e)
 
 if __name__ == "__main__":
     main()
