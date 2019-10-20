@@ -5,7 +5,7 @@ managing local variables.
 
 import copy
 import types
-from typing import Dict, Any
+from typing import Any, Dict
 
 __all__ = ["copy_local_variables"]
 

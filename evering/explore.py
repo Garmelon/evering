@@ -1,10 +1,10 @@
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
-import logging
 
-from .util import *
 from .colors import *
+from .util import *
 
 __all__ = ["FileInfo", "find_config_files"]
 logger = logging.getLogger(__name__)

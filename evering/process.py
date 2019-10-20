@@ -37,7 +37,7 @@ class Processor:
             raise LessCatastrophicError(
                 style_error("Could not load file ") +
                 style_path(path) + f": {e}")
-        
+
         header, lines = split_header_and_rest(text)
 
         try:
@@ -46,7 +46,7 @@ class Processor:
             raise LessCatastrophicError(
                 style_error("Could not parse header of file ") +
                 style_path(path) + f": {e}")
-        
+
         self._process_parseable(lines, config)
 
     def _process_file_with_header(self, path: Path, header_path: Path, config: Config) -> None:

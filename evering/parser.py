@@ -53,7 +53,7 @@ class Parser:
         """
         May raise: ParseException
         """
-        
+
         self.statement_prefix = statement_prefix
         self.expression_prefix = expression_prefix
         self.expression_suffix = expression_suffix
@@ -97,7 +97,7 @@ class Line(ABC):
             pass
 
         return ActualLine(parser, text, line_number)
-    
+
     def __init__(self, parser: Parser, line_number: int) -> None:
         self.parser = parser
         self.line_number = line_number
@@ -112,7 +112,7 @@ class Line(ABC):
 
     def _parse_statement_noarg(self, text: str, statement_name: str) -> bool:
         return text.strip() == f"{self.parser.statement_prefix} {statement_name}"
-    
+
 class ActualLine(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
         """
@@ -128,7 +128,7 @@ class ActualLine(Line):
         argument is the text contained in the chunk and the second
         argument a boolean that indicates whether this chunk is a
         python expression (or just plain text).
-        
+
         Because it simplifies the program logic, a chunk's text may
         also be the empty string.
 
@@ -173,7 +173,7 @@ class ActualLine(Line):
         """
         May raise: ExecuteException
         """
-        
+
         if not chunk[1]:
             return chunk[0]
 
@@ -232,7 +232,7 @@ class Block:
         """
         May raise: ParseException
         """
-        
+
         self._elements: List[Union[ActualLine, IfBlock]] = []
 
         while lines_queue:
@@ -308,7 +308,7 @@ class IfBlock(Block):
         if not isinstance(lines_queue[-1], EndifStatement):
             raise ParseException.on_line(lines_queue[-1], "Expected 'end' statement")
         lines_queue.pop()
-        
+
     def evaluate(self, local_vars: Dict[str, Any]) -> List[str]:
         for entry in self._sections:
             if entry[1] is None or safer_eval(entry[1], local_vars):

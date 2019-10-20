@@ -2,12 +2,13 @@ import argparse
 import logging
 from pathlib import Path
 from typing import Any
+
 from .config import *
+from .explore import *
 from .known_files import *
 from .process import *
-from .util import *
-from .explore import *
 from .prompt import *
+from .util import *
 
 #logging.basicConfig(level=logging.DEBUG, style="{", format="{levelname:>7}: {message}")
 logging.basicConfig(level=logging.INFO, style="{", format="{levelname:>7}: {message}")

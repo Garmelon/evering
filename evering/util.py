@@ -16,10 +16,10 @@ def copy_local_variables(local: Dict[str, Any]) -> Dict[str, Any]:
     Attempts to deep-copy a set of local variables, but keeping
     modules at the top level alone, since they don't tend to deepcopy
     well.
-    
+
     May raise: Not sure at the moment
     """
-    
+
     local_copy = {}
 
     for key, value in local.items():
@@ -32,12 +32,12 @@ def copy_local_variables(local: Dict[str, Any]) -> Dict[str, Any]:
 
 class ExecuteException(Exception):
     pass
- 
+
 def safer_exec(code: str, local_vars: Dict[str, Any]) -> None:
     """
     May raise: ExecuteException
     """
-    
+
     try:
         exec(code, {}, local_vars)
     except Exception as e:
@@ -47,7 +47,7 @@ def safer_eval(code: str, local_vars: Dict[str, Any]) -> Any:
     """
     May raise: ExecuteException
     """
-    
+
     try:
         return eval(code, {}, local_vars)
     except Exception as e:
@@ -60,7 +60,7 @@ def read_file(path: Path) -> str:
     """
     May raise: ReadFileException
     """
-    
+
     try:
         with open(path.expanduser()) as f:
             return f.read()
