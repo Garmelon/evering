@@ -6,16 +6,19 @@ The result of loading a config file are the "local" variables,
 including the modules loaded via "import".
 """
 
-import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+import logging
 
 from .colors import *
 from .util import *
 
 __all__ = [
-    "DEFAULT_LOCATIONS", "DEFAULT_CONFIG_FILE",
-    "ConfigurationException", "Config",
+    "DEFAULT_LOCATIONS",
+    "ConfigurationException",
+    "DefaultConfigValue", "DefaultConfig", "DEFAULT_CONFIG",
+    "Config",
 ]
 logger = logging.getLogger(__name__)
 
@@ -25,71 +28,178 @@ DEFAULT_LOCATIONS = [
     Path("~/.evering.py"),
 ]
 
-DEFAULT_CONFIG_FILE = """
-known_files = "known_files"
-config_dir = "config/"
-binary = True
-statement_prefix = "#"
-expression_delimiters = ("{{", "}}")
-"""
-
 class ConfigurationException(Exception):
     pass
 
+@dataclass
+class DefaultConfigValue:
+    # A short textual description of the value's function
+    description: str
+    # The actual default value
+    value: Any
+    # Whether this variable even has a default value or the value is set at runtime
+    has_constant_value: bool
+
+class DefaultConfig:
+    def __init__(self) -> None:
+        self._values: Dict[str, DefaultConfigValue] = {}
+
+    def add(self,
+            name: str,
+            description: str,
+            value: Any = None,
+            has_constant_value: bool = True
+    ) -> None:
+        if name in self._values:
+            raise ConfigurationException(f"Value {name!r} already exists")
+
+        self._values[name] = DefaultConfigValue(
+            description, value=value, has_constant_value=has_constant_value)
+
+    def get(self, name: str) -> Optional[DefaultConfigValue]:
+        return self._values.get(name)
+
+    def to_local_vars(self) -> Dict[str, Any]:
+        return {name: d.value for name, d in self._values.items() if d.has_constant_value}
+
+    def to_config(self) -> "Config":
+        return Config(self.to_local_vars())
+
+    def to_config_file(self) -> str:
+        """
+        Attempt to convert the DefaultConfig into a format that can be read by a
+        python interpreter. This assumes that all names are valid variable names
+        and that the repr() representations of each object can be read by the
+        interpreter.
+
+        This solution is quite hacky, so use at your own risk :P (At least make
+        sure that this works with all your default values before you use it).
+        """
+
+        lines = ["from pathlib import *", ""]
+
+        for name in sorted(self._values):
+            value = self._values[name]
+
+            if value.has_constant_value:
+                lines.append(f"{name} = {value.value!r} # {value.description}\n")
+            else:
+                lines.append(f"# {name} : {value.description}\n")
+
+        return "".join(lines)
+
+DEFAULT_CONFIG = DefaultConfig()
+
+DEFAULT_CONFIG.add(
+    "base_dir",
+    "All relative paths are interpreted as relative to this directory."
+    " Default: The directory the config file was loaded from",
+    has_constant_value=False)
+
+DEFAULT_CONFIG.add(
+    "known_files",
+    "The file where evering stores which files it is currently managing",
+    value="known_files")
+
+DEFAULT_CONFIG.add(
+    "config_dir",
+    "The directory containing the config files",
+    value="config")
+
+DEFAULT_CONFIG.add(
+    "action_dir",
+    "The directory containing the action scripts",
+    value="actions")
+
+DEFAULT_CONFIG.add(
+    "binary",
+    "When interpreting a header file: When True, the corresponding file is copied directly to the target instead of compiled. Has no effect if a file has no header file",
+    value=True)
+
+DEFAULT_CONFIG.add(
+    "targets",
+    "The locations a config file should be placed in. Must be set for all files. Either a path or a list of paths",
+    has_constant_value=False)
+
+DEFAULT_CONFIG.add(
+    "action",
+    "Whether a file should be treated as an action with a certain name. If set, must be a string",
+    has_constant_value=False)
+
+DEFAULT_CONFIG.add(
+    "statement_prefix",
+    "Determines the prefix for statements like \"if\"",
+    value="#")
+
+DEFAULT_CONFIG.add(
+    "expression_delimiters",
+    "Determines the delimiters for in-line expressions",
+    value=("{{", "}}"))
+
+DEFAULT_CONFIG.add(
+    "filename",
+    "Name of the file currently being compiled, as a string. Set during compilation",
+    has_constant_value=False)
+
+DEFAULT_CONFIG.add(
+    "target",
+    "Location the file is currently being compiled for, as a Path. Set during compilation",
+    has_constant_value=False)
+
 class Config:
-    @classmethod
-    def load_config_file(cls, path: Optional[Path]) -> "Config":
+    @staticmethod
+    def load_config_file(path: Optional[Path]) -> "Config":
         """
         May raise: ConfigurationException
         """
 
-        local_vars: Dict[str, Any]
+        conf = DEFAULT_CONFIG.to_config()
 
         if path is None:
             # Try out all default config file locations
             for path in DEFAULT_LOCATIONS:
                 try:
-                    local_vars = cls._load_config_file(path)
+                    copy = conf.copy()
+                    copy.apply_config_file(path)
+                    conf = copy
                     break
-                except (ReadFileException, ExecuteException) as e:
-                    logger.debug(f"Could not load config from {style_path(path)}: {e}")
+                except ConfigurationException as e:
+                    logger.debug(f"Tried default config file at {style_path(path)} and it didn't work")
             else:
                 raise ConfigurationException(style_error(
                     "No valid config file found in any of the default locations"))
         else:
             # Use the path
             try:
-                local_vars = cls._load_config_file(path)
+                copy = conf.copy()
+                copy.apply_config_file(path)
+                conf = copy
             except (ReadFileException, ExecuteException) as e:
                 raise ConfigurationException(
                     style_error("Could not load config file from ") +
                     style_path(path) + f": {e}")
 
-        return cls(local_vars)
-
-    @staticmethod
-    def _load_config_file(path: Path) -> Dict[str, Any]:
-        """
-        May raise: ReadFileException, ExecuteException
-        """
-
-        local_vars: Dict[str, Any] = {}
-        safer_exec(DEFAULT_CONFIG_FILE, local_vars)
-
-        safer_exec(read_file(path), local_vars)
-        if not "base_dir" in local_vars:
-            local_vars["base_dir"] = path.parent
-
-        logger.info(f"Loaded config from {style_path(str(path))}")
-
-        return local_vars
+        return conf
 
     def __init__(self, local_vars: Dict[str, Any]) -> None:
+        self.local_vars = local_vars
+
+    def apply_config_file(self, path: Path) -> None:
         """
         May raise: ConfigurationException
         """
 
-        self.local_vars = local_vars
+        try:
+            safer_exec(read_file(path), self.local_vars)
+        except (ReadFileException, ExecuteException) as e:
+            error_msg = f"Could not load config from {style_path(path)}: {e}"
+            logger.debug(error_msg)
+            raise ConfigurationException(error_msg)
+        else:
+            if not "base_dir" in self.local_vars:
+                self.local_vars["base_dir"] = path.parent
+
+            logger.info(f"Loaded config from {style_path(path)}")
 
     def copy(self) -> "Config":
         return Config(copy_local_variables(self.local_vars))
@@ -135,12 +245,6 @@ class Config:
 
     @property
     def base_dir(self) -> Path:
-        """
-        The path that is the base of all other relative paths.
-
-        Default: The directory the config file was loaded from.
-        """
-
         return Path(self._get("base_dir", str, Path)).expanduser()
 
     @base_dir.setter
@@ -158,50 +262,24 @@ class Config:
 
     @property
     def known_files(self) -> Path:
-        """
-        The path where evering stores which files it is currently
-        managing.
-
-        Default: "known_files"
-        """
-
         return self._interpret_path(self._get("known_files", str, Path))
 
     @property
     def config_dir(self) -> Path:
-        """
-        The directory containing the config files.
-
-        Default: "config/"
-        """
-
         return self._interpret_path(self._get("config_dir", str, Path))
+
+    @property
+    def action_dir(self) -> Path:
+        return self._interpret_path(self._get("action_dir", str, Path))
 
     # Parsing and compiling behavior
 
     @property
     def binary(self) -> bool:
-        """
-        When interpreting a separate header file: Whether the
-        corresponding file should not be parsed and compiled, but
-        instead just copied to the targets.
-
-        Has no effect if the file has no header files.
-
-        Default: True
-        """
-
         return self._get("binary", bool)
 
     @property
     def targets(self) -> List[Path]:
-        """
-        The locations the (compiled) config file should be put
-        in. Must be set for all files.
-
-        Default: not set
-        """
-
         name = "targets"
         target = self._get(name)
         is_path = self._is_pathy(target)
@@ -219,15 +297,11 @@ class Config:
             return [self._interpret_path(elem) for elem in target]
 
     @property
+    def action(self) -> Optional[str]:
+        return self._get_optional("action", str)
+
+    @property
     def statement_prefix(self) -> str:
-        """
-        This determines the prefix for statements like "# if",
-        "# elif", "# else" or "# endif". The prefix always has at
-        least length 1.
-
-        Default: "#"
-        """
-
         name = "statement_prefix"
         prefix = self._get(name, str)
 
@@ -240,16 +314,6 @@ class Config:
 
     @property
     def expression_delimiters(self) -> Tuple[str, str]:
-        """
-        This determines the delimiters for expressions like
-        "{{ 1 + 1 }}".
-
-        It is a tuple of the form: (<prefix>, <suffix>), where both
-        the prefix and suffix are strings of at least length 1.
-
-        Default: ("{{", "}}")
-        """
-
         name = "expression_delimiters"
         delimiters = self._get(name, tuple)
 
@@ -269,12 +333,6 @@ class Config:
 
     @property
     def filename(self) -> str:
-        """
-        The name of the file currently being compiled, as a string.
-
-        Only set during compilation.
-        """
-
         return self._get("filename", str)
 
     @filename.setter
@@ -283,13 +341,6 @@ class Config:
 
     @property
     def target(self) -> Path:
-        """
-        The location the file is currently being compiled for, as a
-        Path.
-
-        Only set during compilation.
-        """
-
         return self._interpret_path(self._get("target", str, Path))
 
     @target.setter
