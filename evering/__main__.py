@@ -11,8 +11,10 @@ from .process import *
 from .prompt import *
 from .util import *
 
+LOG_STYLE = "{"
+LOG_FORMAT = "{levelname:>7}: {message}"
 #logging.basicConfig(level=logging.DEBUG, style="{", format="{levelname:>7}: {message}")
-logging.basicConfig(level=logging.INFO, style="{", format="{levelname:>7}: {message}")
+#logging.basicConfig(level=logging.INFO, style="{", format="{levelname:>7}: {message}")
 logger = logging.getLogger(__name__)
 
 HEADER_FILE_SUFFIX = ".evering-header"
@@ -84,8 +86,12 @@ def run(args: Any) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config-file")
-
+    parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
+
+    level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=level, style=LOG_STYLE, format=LOG_FORMAT)
+
     try:
         run(args)
     except CatastrophicError as e:
