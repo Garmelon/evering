@@ -122,8 +122,8 @@ DEFAULT_CONFIG.add(
 
 DEFAULT_CONFIG.add(
     "targets",
-    "The locations a config file should be placed in. Must be set for all files. Either a path or a list of paths",
-    has_constant_value=False)
+    "The locations a config file should be placed in. Either a path or a list of paths",
+    value=[])
 
 DEFAULT_CONFIG.add(
     "action",

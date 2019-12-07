@@ -109,6 +109,10 @@ class Processor:
             self._update_known_hash(target)
 
     def _process_parseable(self, lines: List[str], config: Config, source: Path) -> None:
+        if not config.targets:
+            logger.info("  (no targets)")
+            return
+
         for target in config.targets:
             logger.info(f"  -> {style_path(str(target))}")
 
