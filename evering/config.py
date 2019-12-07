@@ -112,7 +112,7 @@ DEFAULT_CONFIG.add(
 
 DEFAULT_CONFIG.add(
     "action_dir",
-    "The directory containing the action scripts",
+    "The directory to copy the action scripts to",
     value="actions")
 
 DEFAULT_CONFIG.add(
@@ -139,6 +139,8 @@ DEFAULT_CONFIG.add(
     "expression_delimiters",
     "Determines the delimiters for in-line expressions",
     value=("{{", "}}"))
+
+# Compile-time info
 
 DEFAULT_CONFIG.add(
     "filename",
@@ -285,20 +287,29 @@ class Config:
     @property
     def targets(self) -> List[Path]:
         name = "targets"
-        target = self._get(name)
-        is_path = self._is_pathy(target)
-        is_list_of_paths = (isinstance(target, list) and
-                            all(self._is_pathy(elem) for elem in target))
+        targets = self._get(name)
 
+        # Check whether targets argument has the correct format
+        is_path = self._is_pathy(targets)
+        is_list_of_paths = (isinstance(targets, list) and
+                            all(self._is_pathy(elem) for elem in targets))
         if not is_path and not is_list_of_paths:
             raise ConfigurationException(
                 style_error("Expected variable ") + style_var(name) +
                 style_error(" to be either a path or a list of paths"))
 
+        paths: List[Path]
         if is_path:
-            return [self._interpret_path(target)]
+            paths = [self._interpret_path(targets)]
         else:
-            return [self._interpret_path(elem) for elem in target]
+            paths = [self._interpret_path(elem) for elem in targets]
+
+        # If this is an action, just treat it like yet another target in a very
+        # specific location
+        if self.action is not None:
+            paths.append(self.action_dir / self.action)
+
+        return paths
 
     @property
     def action(self) -> Optional[str]:
