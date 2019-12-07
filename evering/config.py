@@ -152,6 +152,16 @@ DEFAULT_CONFIG.add(
     "Location the file is currently being compiled for, as a Path. Set during compilation",
     has_constant_value=False)
 
+DEFAULT_CONFIG.add(
+    "user",
+    "Current username. Set during compilation",
+    has_constant_value=False)
+
+DEFAULT_CONFIG.add(
+    "host",
+    "Name of the current computer. Set during compilation",
+    has_constant_value=False)
+
 class Config:
     @staticmethod
     def load_config_file(path: Optional[Path]) -> "Config":
@@ -361,3 +371,19 @@ class Config:
     @target.setter
     def target(self, path: Path) -> None:
         self._set("target", path)
+
+    @property
+    def user(self) -> str:
+        return self._get("user", str)
+
+    @target.setter
+    def user(self, user: str) -> None:
+        self._set("user", user)
+
+    @property
+    def host(self) -> str:
+        return self._get("host", str)
+
+    @target.setter
+    def host(self, host: str) -> None:
+        self._set("host", host)

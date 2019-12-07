@@ -82,8 +82,12 @@ class Processor:
     def _process_binary(self, path: Path, config: Config) -> None:
         logger.debug(f"Processing as a binary file")
 
+        if not config.targets:
+            logger.info("  (no targets)")
+            return
+
         for target in config.targets:
-            logger.info(f"  -> {style_path(str(target))}")
+            logger.info(f"  -> {style_path(target)}")
 
             if not self._justify_target(target):
                 logger.info("Skipping this target")
@@ -114,7 +118,7 @@ class Processor:
             return
 
         for target in config.targets:
-            logger.info(f"  -> {style_path(str(target))}")
+            logger.info(f"  -> {style_path(target)}")
 
             if not self._justify_target(target):
                 logger.info("Skipping this target")
@@ -122,6 +126,8 @@ class Processor:
 
             config_copy = config.copy()
             config_copy.target = target
+            config_copy.user = get_user()
+            config_copy.host = get_host()
 
             try:
                 parser = Parser(

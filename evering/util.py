@@ -1,10 +1,13 @@
 import copy
+import getpass
+import socket
 import types
 from pathlib import Path
 from typing import Any, Dict
 
 __all__ = [
     "copy_local_variables",
+    "get_user", "get_host",
     "ExecuteException", "safer_exec", "safer_eval",
     "ReadFileException", "read_file",
     "WriteFileException", "write_file",
@@ -29,6 +32,12 @@ def copy_local_variables(local: Dict[str, Any]) -> Dict[str, Any]:
             local_copy[key] = copy.deepcopy(value)
 
     return local_copy
+
+def get_user() -> str:
+    return getpass.getuser()
+
+def get_host() -> str:
+    return socket.gethostname()
 
 class ExecuteException(Exception):
     pass
