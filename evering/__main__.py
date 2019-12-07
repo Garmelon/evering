@@ -85,12 +85,19 @@ def run(args: Any) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config-file")
+    parser.add_argument("-c", "--config-file", type=Path)
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--export-default-config", type=Path)
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level, style=LOG_STYLE, format=LOG_FORMAT)
+
+    if args.export_default_config is not None:
+        logger.info(f"Exporting default config to {style_path(args.export_default_config)}")
+        with open(args.export_default_config, "w") as f:
+            f.write(DEFAULT_CONFIG.to_config_file())
+        return
 
     try:
         run(args)

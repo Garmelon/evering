@@ -81,12 +81,16 @@ class DefaultConfig:
         for name in sorted(self._values):
             value = self._values[name]
 
+            line: str
             if value.has_constant_value:
-                lines.append(f"{name} = {value.value!r} # {value.description}\n")
+                line = f"{name} = {value.value!r}"
             else:
-                lines.append(f"# {name} : {value.description}\n")
+                line = f"# {name}"
 
-        return "".join(lines)
+            line = f"{line:<32} # {value.description}"
+            lines.append(line)
+
+        return "\n".join(lines) + "\n"
 
 DEFAULT_CONFIG = DefaultConfig()
 
