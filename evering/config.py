@@ -208,6 +208,9 @@ class Config:
         May raise: ConfigurationException
         """
 
+        if not "base_dir" in self.local_vars:
+            self.local_vars["base_dir"] = path.parent
+
         try:
             safer_exec(read_file(path), self.local_vars)
         except (ReadFileException, ExecuteException) as e:
@@ -215,9 +218,6 @@ class Config:
             logger.debug(error_msg)
             raise ConfigurationException(error_msg)
         else:
-            if not "base_dir" in self.local_vars:
-                self.local_vars["base_dir"] = path.parent
-
             logger.info(f"Loaded config from {style_path(path)}")
 
     def copy(self) -> "Config":
