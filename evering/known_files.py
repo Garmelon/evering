@@ -67,7 +67,7 @@ class KnownFiles:
             else:
                 to_save[str(path)] = self._old_known_files[path]
 
-        self._save(json.dumps(to_save))
+        self._save(json.dumps(to_save, indent=2))
         logger.debug(f"Incremental save to {style_path(self._path)} completed")
 
     def find_forgotten_files(self) -> Set[Path]:
@@ -84,7 +84,7 @@ class KnownFiles:
         for path, file_hash in self._new_known_files.items():
             to_save[str(path)] = file_hash
 
-        self._save(json.dumps(to_save))
+        self._save(json.dumps(to_save, indent=2))
         logger.debug(f"Final save to {style_path(self._path)} completed")
 
     def _save(self, text: str) -> None:
