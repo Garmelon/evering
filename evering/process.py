@@ -126,8 +126,6 @@ class Processor:
 
             config_copy = config.copy()
             config_copy.target = target
-            config_copy.user = get_user()
-            config_copy.host = get_host()
 
             try:
                 parser = Parser(

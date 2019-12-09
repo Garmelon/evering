@@ -63,7 +63,10 @@ class DefaultConfig:
         return {name: d.value for name, d in self._values.items() if d.has_constant_value}
 
     def to_config(self) -> "Config":
-        return Config(self.to_local_vars())
+        config = Config(self.to_local_vars())
+        config.user = get_user()
+        config.host = get_host()
+        return config
 
     def to_config_file(self) -> str:
         """
