@@ -190,13 +190,13 @@ class Processor:
             logger.warning(style_warning("The target is a directory"))
             return False
 
-        target_hash = self._obtain_hash(target)
-        if target_hash is None:
-            return prompt_yes_no("Overwriting a file that could not be hashed, continue?", False)
-
         if self.known_files.was_recently_modified(target):
             logger.warning(style_warning("This target was already overwritten earlier"))
             return False
+
+        target_hash = self._obtain_hash(target)
+        if target_hash is None:
+            return prompt_yes_no("Overwriting a file that could not be hashed, continue?", False)
 
         known_target_hash = self.known_files.get_hash(target)
         if known_target_hash is None:

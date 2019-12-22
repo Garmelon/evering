@@ -79,7 +79,8 @@ def run(args: Any) -> None:
                 raise CatastrophicError("Aborted")
 
     for path in known_files.find_forgotten_files():
-        logger.info(f"The file {style_path(path)} is no longer known")
+        logger.info(style_warning("The file ") + style_path(path)
+                    + style_warning(" is no longer known"))
 
     known_files.save_final()
 

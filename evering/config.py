@@ -6,10 +6,10 @@ The result of loading a config file are the "local" variables,
 including the modules loaded via "import".
 """
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-import logging
 
 from .colors import *
 from .util import *
@@ -183,7 +183,7 @@ class Config:
                     conf = copy
                     break
                 except ConfigurationException as e:
-                    logger.debug(f"Tried default config file at {style_path(path)} and it didn't work")
+                    logger.debug(f"Tried default config file at {style_path(path)} and it didn't work: {e}")
             else:
                 raise ConfigurationException(style_error(
                     "No valid config file found in any of the default locations"))
