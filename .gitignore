@@ -1,9 +1,3 @@
-# venv stuff
-bin/
-lib/
-lib64
-pyvenv.cfg
-
-# other python stuff
+.venv/
 .mypy_cache/
 __pycache__/
