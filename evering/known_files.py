@@ -1,13 +1,14 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
-from .colors import *
-from .util import *
+from .colors import style_error, style_path
+from .util import CatastrophicError, WriteFileException, write_file
 
 __all__ = ["KnownFiles"]
 logger = logging.getLogger(__name__)
+
 
 class KnownFiles:
     def __init__(self, path: Path) -> None:
@@ -18,7 +19,7 @@ class KnownFiles:
         try:
             with open(self._path) as f:
                 self._old_known_files = self._read_known_files(f.read())
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             logger.debug(f"File {style_path(self._path)} does not exist, "
                          "creating a new file on the first upcoming save")
 
@@ -30,13 +31,16 @@ class KnownFiles:
         raw_known_files = json.loads(text)
 
         if not isinstance(raw_known_files, dict):
-            raise CatastrophicError(style_error("Root level structure is not a dictionary"))
+            raise CatastrophicError(style_error(
+                "Root level structure is not a dictionary"))
 
         for path, file_hash in raw_known_files.items():
             if not isinstance(path, str):
-                raise CatastrophicError(style_error(f"Path {path!r} is not a string"))
+                raise CatastrophicError(style_error(
+                    f"Path {path!r} is not a string"))
             if not isinstance(file_hash, str):
-                raise CatastrophicError(style_error(f"Hash {hash!r} at path {path!r} is not a string"))
+                raise CatastrophicError(style_error(
+                    f"Hash {hash!r} at path {path!r} is not a string"))
 
             path = self._normalize_path(Path(path))
             known_files[path] = file_hash
@@ -61,7 +65,8 @@ class KnownFiles:
 
     def save_incremental(self) -> None:
         to_save: Dict[str, str] = {}
-        for path in self._old_known_files.keys() | self._new_known_files.keys():
+        paths = self._old_known_files.keys() | self._new_known_files.keys()
+        for path in paths:
             if path in self._new_known_files:
                 to_save[str(path)] = self._new_known_files[path]
             else:
@@ -93,7 +98,7 @@ class KnownFiles:
 
         try:
             write_file(path, text)
-            path.replace(self._path) # Assumed to be atomic
+            path.replace(self._path)  # Assumed to be atomic
         except (WriteFileException, OSError) as e:
             raise CatastrophicError(
                 style_error("Error saving known files to ") +

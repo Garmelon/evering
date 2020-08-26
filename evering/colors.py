@@ -5,13 +5,15 @@ escape sequences.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Union
 
 __all__ = [
     "CSI", "ERASE_LINE",
     "BOLD", "ITALIC", "UNDERLINE",
     "Color",
-    "BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE", "BRIGHT_BLACK", "BRIGHT_RED", "BRIGHT_GREEN", "BRIGHT_YELLOW", "BRIGHT_BLUE", "BRIGHT_MAGENTA", "BRIGHT_CYAN", "BRIGHT_WHITE",
+    "BLACK", "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE",
+    "BRIGHT_BLACK", "BRIGHT_RED", "BRIGHT_GREEN", "BRIGHT_YELLOW",
+    "BRIGHT_BLUE", "BRIGHT_MAGENTA", "BRIGHT_CYAN", "BRIGHT_WHITE",
     "style_sequence", "styled",
     "style_path", "style_var", "style_error", "style_warning",
 ]
@@ -30,10 +32,12 @@ UNDERLINE = 4
 
 # Colors
 
+
 @dataclass
 class Color:
     fg: int
     bg: int
+
 
 BLACK = Color(30, 40)
 RED = Color(31, 41)
@@ -52,9 +56,11 @@ BRIGHT_MAGENTA = Color(95, 105)
 BRIGHT_CYAN = Color(96, 106)
 BRIGHT_WHITE = Color(97, 107)
 
+
 def style_sequence(*args: int) -> str:
     arglist = ";".join(str(arg) for arg in args)
     return f"{CSI}{arglist}m"
+
 
 def styled(text: str, *args: int) -> str:
     if args:
@@ -62,18 +68,22 @@ def styled(text: str, *args: int) -> str:
         reset = style_sequence()
         return f"{sequence}{text}{reset}"
     else:
-        return text # No styling necessary
+        return text  # No styling necessary
+
 
 def style_path(path: Union[str, Path]) -> str:
     if isinstance(path, Path):
         path = str(path)
     return styled(path, BRIGHT_BLACK.fg, BOLD)
 
+
 def style_var(text: str) -> str:
     return styled(repr(text), BLUE.fg)
 
+
 def style_error(text: str) -> str:
     return styled(text, RED.fg, BOLD)
+
 
 def style_warning(text: str) -> str:
     return styled(text, YELLOW.fg, BOLD)

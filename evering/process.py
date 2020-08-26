@@ -4,22 +4,27 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
-from .colors import *
-from .config import *
-from .known_files import *
-from .parser import *
-from .prompt import *
-from .util import *
+from .colors import style_error, style_path, style_warning
+from .config import Config
+from .known_files import KnownFiles
+from .parser import ParseException, Parser, split_header_and_rest
+from .prompt import prompt_yes_no
+from .util import (ExecuteException, LessCatastrophicError, ReadFileException,
+                   WriteFileException, read_file, safer_exec, write_file)
 
 __all__ = ["Processor"]
 logger = logging.getLogger(__name__)
+
 
 class Processor:
     def __init__(self, config: Config, known_files: KnownFiles) -> None:
         self.config = config
         self.known_files = known_files
 
-    def process_file(self, path: Path, header_path: Optional[Path] = None) -> None:
+    def process_file(self,
+                     path: Path,
+                     header_path: Optional[Path] = None
+                     ) -> None:
         logger.info(f"{style_path(path)}:")
 
         config = self.config.copy()
@@ -51,7 +56,11 @@ class Processor:
 
         self._process_parseable(lines, config, path)
 
-    def _process_file_with_header(self, path: Path, header_path: Path, config: Config) -> None:
+    def _process_file_with_header(self,
+                                  path: Path,
+                                  header_path: Path,
+                                  config: Config
+                                  ) -> None:
         logger.debug(f"Processing file {style_path(path)} "
                      f"with header {style_path(header_path)}")
 
@@ -80,7 +89,7 @@ class Processor:
             self._process_parseable(lines, config, path)
 
     def _process_binary(self, path: Path, config: Config) -> None:
-        logger.debug(f"Processing as a binary file")
+        logger.debug("Processing as a binary file")
 
         if not config.targets:
             logger.info("  (no targets)")
@@ -96,7 +105,10 @@ class Processor:
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
             except IOError as e:
-                logger.warning(style_warning("Could not create target directory") + f": {e}")
+                logger.warning(
+                    style_warning("Could not create target directory") +
+                    f": {e}"
+                )
                 continue
 
             try:
@@ -108,11 +120,16 @@ class Processor:
             try:
                 shutil.copymode(path, target)
             except shutil.Error as e:
-                logger.warning(style_warning("Could not copy permissions") + f": {e}")
+                logger.warning(style_warning("Could not copy permissions") +
+                               f": {e}")
 
             self._update_known_hash(target)
 
-    def _process_parseable(self, lines: List[str], config: Config, source: Path) -> None:
+    def _process_parseable(self,
+                           lines: List[str],
+                           config: Config,
+                           source: Path
+                           ) -> None:
         if not config.targets:
             logger.info("  (no targets)")
             return
@@ -149,19 +166,24 @@ class Processor:
             try:
                 target.parent.mkdir(parents=True, exist_ok=True)
             except IOError as e:
-                logger.warning(style_warning("Could not create target directory") + f": {e}")
+                logger.warning(
+                    style_warning("Could not create target directory") +
+                    f": {e}"
+                )
                 continue
 
             try:
                 write_file(target, text)
             except WriteFileException as e:
-                logger.warning(style_warning("Could not write to target") + f": {e}")
+                logger.warning(style_warning("Could not write to target") +
+                               f": {e}")
                 continue
 
             try:
                 shutil.copymode(source, target)
             except shutil.Error as e:
-                logger.warning(style_warning("Could not copy permissions") + f": {e}")
+                logger.warning(style_warning("Could not copy permissions") +
+                               f": {e}")
 
             self._update_known_hash(target)
 
@@ -174,7 +196,8 @@ class Processor:
             with open(path, "rb") as f:
                 while True:
                     block = f.read(BLOCK_SIZE)
-                    if not block: break
+                    if not block:
+                        break
                     h.update(block)
 
             return h.hexdigest()
@@ -191,16 +214,19 @@ class Processor:
             return False
 
         if self.known_files.was_recently_modified(target):
-            logger.warning(style_warning("This target was already overwritten earlier"))
+            logger.warning(style_warning("This target was already overwritten "
+                                         "earlier"))
             return False
 
         target_hash = self._obtain_hash(target)
         if target_hash is None:
-            return prompt_yes_no("Overwriting a file that could not be hashed, continue?", False)
+            return prompt_yes_no("Overwriting a file that could not be "
+                                 "hashed, continue?", False)
 
         known_target_hash = self.known_files.get_hash(target)
         if known_target_hash is None:
-            return prompt_yes_no("Overwriting an unknown file, continue?", False)
+            return prompt_yes_no("Overwriting an unknown file, continue?",
+                                 False)
 
         # The following condition is phrased awkwardly because I just
         # feel better if the final statement in this function is not a
@@ -212,7 +238,8 @@ class Processor:
             # last seen it.
             return True
 
-        return prompt_yes_no("Overwriting a file that was modified since it was last overwritten, continue?", False)
+        return prompt_yes_no("Overwriting a file that was modified since it "
+                             "was last overwritten, continue?", False)
 
     def _update_known_hash(self, target: Path) -> None:
         target_hash = self._obtain_hash(target)

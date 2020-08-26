@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from .util import *
+from .util import safer_eval
 
 """
 This parsing solution has the following structure:
@@ -9,7 +9,7 @@ This parsing solution has the following structure:
 1. Separate header and config file content, if necessary
 2. Split up text into lines, if still necessary
 3. Parse each line individually
-4. Use a recursive descent approach to group the lines into blocks and if-blocks
+4. Use recursive descent approach to group the lines into blocks and if-blocks
 5. Evaluate the blocks recursively
 """
 
@@ -17,6 +17,7 @@ __all__ = [
     "split_header_and_rest",
     "ParseException", "Parser",
 ]
+
 
 def split_header_and_rest(text: str) -> Tuple[List[str], List[str]]:
     lines = text.splitlines()
@@ -38,10 +39,12 @@ def split_header_and_rest(text: str) -> Tuple[List[str], List[str]]:
 
     return header, rest
 
+
 class ParseException(Exception):
     @classmethod
     def on_line(cls, line: "Line", text: str) -> "ParseException":
         return ParseException(f"Line {line.line_number}: {text}")
+
 
 class Parser:
     def __init__(self,
@@ -49,7 +52,7 @@ class Parser:
                  statement_prefix: str,
                  expression_prefix: str,
                  expression_suffix: str,
-    ) -> None:
+                 ) -> None:
         """
         May raise: ParseException
         """
@@ -70,6 +73,7 @@ class Parser:
     def evaluate(self, local_vars: Dict[str, Any]) -> str:
         lines = self.main_block.evaluate(local_vars)
         return "".join(f"{line}\n" for line in lines)
+
 
 # Line parsing (inline expressions)
 
@@ -102,7 +106,10 @@ class Line(ABC):
         self.parser = parser
         self.line_number = line_number
 
-    def _parse_statement(self, text: str, statement_name: str) -> Optional[str]:
+    def _parse_statement(self,
+                         text: str,
+                         statement_name: str
+                         ) -> Optional[str]:
         start = f"{self.parser.statement_prefix} {statement_name}"
         text = text.strip()
         if text.startswith(start):
@@ -111,7 +118,9 @@ class Line(ABC):
             return None
 
     def _parse_statement_noarg(self, text: str, statement_name: str) -> bool:
-        return text.strip() == f"{self.parser.statement_prefix} {statement_name}"
+        target = f"{self.parser.statement_prefix} {statement_name}"
+        return text.strip() == target
+
 
 class ActualLine(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
@@ -143,13 +152,17 @@ class ActualLine(Line):
             od = text.find(self.parser.expression_prefix, i)
             if od == -1:
                 chunks.append((text[i:], False))
-                break # We've consumed the entire string.
+                break  # We've consumed the entire string.
             od_end = od + len(self.parser.expression_prefix)
 
             # Find expression suffix
             cd = text.find(self.parser.expression_suffix, od_end)
             if cd == -1:
-                raise ParseException.on_line(self, f"No matching expression suffix\n{text[:od_end]} <-- to THIS expression prefix")
+                raise ParseException.on_line(
+                    self,
+                    f"No matching expression suffix\n{text[:od_end]} "
+                    "<-- to THIS expression prefix"
+                )
             cd_end = cd + len(self.parser.expression_suffix)
 
             # Split up into chunks
@@ -164,12 +177,13 @@ class ActualLine(Line):
         May raise: ExecuteException
         """
 
-        return "".join(self._evaluate_chunk(chunk, local_vars) for chunk in self.chunks)
+        return "".join(self._evaluate_chunk(chunk, local_vars)
+                       for chunk in self.chunks)
 
     def _evaluate_chunk(self,
                         chunk: Tuple[str, bool],
                         local_vars: Dict[str, Any],
-    ) -> str:
+                        ) -> str:
         """
         May raise: ExecuteException
         """
@@ -178,6 +192,7 @@ class ActualLine(Line):
             return chunk[0]
 
         return str(safer_eval(chunk[0], local_vars))
+
 
 class IfStatement(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
@@ -191,6 +206,7 @@ class IfStatement(Line):
         if self.argument is None:
             raise ParseException.on_line(self, "Not an 'if' statement")
 
+
 class ElifStatement(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
         """
@@ -203,6 +219,7 @@ class ElifStatement(Line):
         if self.argument is None:
             raise ParseException.on_line(self, "Not an 'elif' statement")
 
+
 class ElseStatement(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
         """
@@ -213,6 +230,7 @@ class ElseStatement(Line):
 
         if not self._parse_statement_noarg(text, "else"):
             raise ParseException.on_line(self, "Not an 'else' statement")
+
 
 class EndifStatement(Line):
     def __init__(self, parser: Parser, text: str, line_number: int) -> None:
@@ -225,6 +243,7 @@ class EndifStatement(Line):
         if not self._parse_statement_noarg(text, "endif"):
             raise ParseException.on_line(self, "Not an 'endif' statement")
 
+
 # Block parsing
 
 class Block:
@@ -236,7 +255,7 @@ class Block:
         self._elements: List[Union[ActualLine, IfBlock]] = []
 
         while lines_queue:
-            next_line = lines_queue[-1] # Peek
+            next_line = lines_queue[-1]  # Peek
             if isinstance(next_line, ActualLine):
                 lines_queue.pop()
                 self._elements.append(next_line)
@@ -259,6 +278,7 @@ class Block:
 
         return lines
 
+
 class IfBlock(Block):
     def __init__(self, parser: Parser, lines_queue: List[Line]) -> None:
         """
@@ -268,18 +288,19 @@ class IfBlock(Block):
         self._sections: List[Tuple[Block, Optional[str]]] = []
 
         if not lines_queue:
-            raise ParseException("Unexpected end of file, expected 'if' statement")
+            raise ParseException("Unexpected end of file, expected 'if' "
+                                 "statement")
 
         # If statement
         #
         # This is the short version:
-        # if not isinstance(lines_queue[-1], IfStatement): # This should never happen
+        # if not isinstance(lines_queue[-1], IfStatement): # Should never happen
         #     raise ParseException.on_line(lines_queue[-1], "Expected 'if' statement")
         # self._sections.append((Block(parser, lines_queue), lines_queue.pop().argument))
         #
         # And this the long version, which mypy understands without errors:
         next_statement = lines_queue[-1]
-        if not isinstance(next_statement, IfStatement): # This should never happen
+        if not isinstance(next_statement, IfStatement):  # Should never happen
             raise ParseException.on_line(next_statement, "Expected 'if' statement")
         lines_queue.pop()
         self._sections.append((Block(parser, lines_queue), next_statement.argument))

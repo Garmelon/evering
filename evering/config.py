@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from .colors import *
-from .util import *
+from .colors import style_error, style_path, style_var
+from .util import (ExecuteException, ReadFileException, copy_local_variables,
+                   get_host, get_user, read_file, safer_exec)
 
 __all__ = [
     "DEFAULT_LOCATIONS",
@@ -28,8 +29,10 @@ DEFAULT_LOCATIONS = [
     Path("~/.evering.py"),
 ]
 
+
 class ConfigurationException(Exception):
     pass
+
 
 @dataclass
 class DefaultConfigValue:
@@ -37,8 +40,10 @@ class DefaultConfigValue:
     description: str
     # The actual default value
     value: Any
-    # Whether this variable even has a default value or the value is set at runtime
+    # Whether this variable even has a default value or the value is set at
+    # runtime
     has_constant_value: bool
+
 
 class DefaultConfig:
     def __init__(self) -> None:
@@ -49,7 +54,7 @@ class DefaultConfig:
             description: str,
             value: Any = None,
             has_constant_value: bool = True
-    ) -> None:
+            ) -> None:
         if name in self._values:
             raise ConfigurationException(f"Value {name!r} already exists")
 
@@ -60,7 +65,9 @@ class DefaultConfig:
         return self._values.get(name)
 
     def to_local_vars(self) -> Dict[str, Any]:
-        return {name: d.value for name, d in self._values.items() if d.has_constant_value}
+        return {name: d.value
+                for name, d in self._values.items()
+                if d.has_constant_value}
 
     def to_config(self) -> "Config":
         config = Config(self.to_local_vars())
@@ -70,10 +77,10 @@ class DefaultConfig:
 
     def to_config_file(self) -> str:
         """
-        Attempt to convert the DefaultConfig into a format that can be read by a
-        python interpreter. This assumes that all names are valid variable names
-        and that the repr() representations of each object can be read by the
-        interpreter.
+        Attempt to convert the DefaultConfig into a format that can be read by
+        a python interpreter. This assumes that all names are valid variable
+        names and that the repr() representations of each object can be read by
+        the interpreter.
 
         This solution is quite hacky, so use at your own risk :P (At least make
         sure that this works with all your default values before you use it).
@@ -94,6 +101,7 @@ class DefaultConfig:
             lines.append(line)
 
         return "\n".join(lines) + "\n"
+
 
 DEFAULT_CONFIG = DefaultConfig()
 
@@ -120,17 +128,21 @@ DEFAULT_CONFIG.add(
 
 DEFAULT_CONFIG.add(
     "binary",
-    "When interpreting a header file: When True, the corresponding file is copied directly to the target instead of compiled. Has no effect if a file has no header file",
+    ("When interpreting a header file: When True, the corresponding file is "
+     "copied directly to the target instead of compiled. Has no effect if a "
+     "file has no header file"),
     value=True)
 
 DEFAULT_CONFIG.add(
     "targets",
-    "The locations a config file should be placed in. Either a path or a list of paths",
+    ("The locations a config file should be placed in. Either a path or a "
+     "list of paths"),
     value=[])
 
 DEFAULT_CONFIG.add(
     "action",
-    "Whether a file should be treated as an action with a certain name. If set, must be a string",
+    ("Whether a file should be treated as an action with a certain name. If "
+     "set, must be a string"),
     has_constant_value=False)
 
 DEFAULT_CONFIG.add(
@@ -147,12 +159,14 @@ DEFAULT_CONFIG.add(
 
 DEFAULT_CONFIG.add(
     "filename",
-    "Name of the file currently being compiled, as a string. Set during compilation",
+    ("Name of the file currently being compiled, as a string. Set during "
+     "compilation"),
     has_constant_value=False)
 
 DEFAULT_CONFIG.add(
     "target",
-    "Location the file is currently being compiled for, as a Path. Set during compilation",
+    ("Location the file is currently being compiled for, as a Path. Set "
+     "during compilation"),
     has_constant_value=False)
 
 DEFAULT_CONFIG.add(
@@ -164,6 +178,7 @@ DEFAULT_CONFIG.add(
     "host",
     "Name of the current computer. Set during compilation",
     has_constant_value=False)
+
 
 class Config:
     @staticmethod
@@ -183,10 +198,13 @@ class Config:
                     conf = copy
                     break
                 except ConfigurationException as e:
-                    logger.debug(f"Tried default config file at {style_path(path)} and it didn't work: {e}")
+                    logger.debug("Tried default config file at "
+                                 f"{style_path(path)} and it didn't work: {e}")
             else:
                 raise ConfigurationException(style_error(
-                    "No valid config file found in any of the default locations"))
+                    "No valid config file found in any of the default "
+                    "locations"
+                ))
         else:
             # Use the path
             try:
@@ -208,7 +226,7 @@ class Config:
         May raise: ConfigurationException
         """
 
-        if not "base_dir" in self.local_vars:
+        if "base_dir" not in self.local_vars:
             self.local_vars["base_dir"] = path.parent
 
         try:
@@ -228,10 +246,11 @@ class Config:
         May raise: ConfigurationException
         """
 
-        if not name in self.local_vars:
+        if name not in self.local_vars:
             raise ConfigurationException(
-                style_error(f"Expected a variable named ") +
-                style_var(name))
+                style_error("Expected a variable named ") +
+                style_var(name)
+            )
 
         value = self.local_vars[name]
 
@@ -246,7 +265,7 @@ class Config:
         return value
 
     def _get_optional(self, name: str, *types: type) -> Optional[Any]:
-        if not name in self.local_vars:
+        if name not in self.local_vars:
             return None
         else:
             return self._get(name, *types)
@@ -273,10 +292,12 @@ class Config:
     def _interpret_path(self, path: Union[str, Path]) -> Path:
         path = Path(path).expanduser()
         if path.is_absolute():
-            logger.debug(style_path(path) + " is absolute, no interpreting required")
+            logger.debug(f"{style_path(path)} is absolute, no interpreting "
+                         "required")
             return path
         else:
-            logger.debug(style_path(path) + " is relative, interpreting as " + style_path(self.base_dir / path))
+            logger.debug(f"{style_path(path)} is relative, interpreting as "
+                         f"{style_path(self.base_dir / path)}")
             return self.base_dir / path
 
     @property
@@ -353,7 +374,7 @@ class Config:
         if len(delimiters[0]) < 1 or len(delimiters[1]) < 1:
             raise ConfigurationException(
                 style_error("Expected both strings in variable ") +
-                style_var(name) + style_error( "to be of length >= 1"))
+                style_var(name) + style_error("to be of length >= 1"))
 
         return delimiters
 

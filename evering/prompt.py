@@ -2,6 +2,7 @@ from typing import Optional
 
 __all__ = ["prompt_choice", "prompt_yes_no"]
 
+
 def prompt_choice(question: str, options: str) -> str:
     default_option = None
     for char in options:
@@ -21,6 +22,7 @@ def prompt_choice(question: str, options: str) -> str:
             return result
         else:
             print(f"Invalid answer, please choose one of [{option_string}].")
+
 
 def prompt_yes_no(question: str, default_answer: Optional[bool]) -> bool:
     if default_answer is None:

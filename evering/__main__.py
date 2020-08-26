@@ -3,18 +3,18 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from .colors import *
-from .config import *
-from .explore import *
-from .known_files import *
-from .process import *
-from .prompt import *
-from .util import *
+from .colors import style_path, style_warning
+from .config import DEFAULT_CONFIG, Config, ConfigurationException
+from .explore import find_config_files
+from .known_files import KnownFiles
+from .process import Processor
+from .prompt import prompt_choice
+from .util import CatastrophicError, LessCatastrophicError
 
 LOG_STYLE = "{"
 LOG_FORMAT = "{levelname:>7}: {message}"
-#logging.basicConfig(level=logging.DEBUG, style="{", format="{levelname:>7}: {message}")
-#logging.basicConfig(level=logging.INFO, style="{", format="{levelname:>7}: {message}")
+# logging.basicConfig(level=logging.DEBUG, style="{", format="{levelname:>7}: {message}")
+# logging.basicConfig(level=logging.INFO, style="{", format="{levelname:>7}: {message}")
 logger = logging.getLogger(__name__)
 
 HEADER_FILE_SUFFIX = ".evering-header"
@@ -62,8 +62,10 @@ Writing problems:
 - can't write to known files (error)
 """
 
+
 def run(args: Any) -> None:
-    config = Config.load_config_file(args.config_file and Path(args.config_file) or None)
+    config = Config.load_config_file(args.config_file
+                                     and Path(args.config_file) or None)
     known_files = KnownFiles(config.known_files)
 
     processor = Processor(config, known_files)
@@ -75,7 +77,8 @@ def run(args: Any) -> None:
         except LessCatastrophicError as e:
             logger.error(e)
 
-            if prompt_choice("[C]ontinue to the next file or [A]bort the program?", "Ca") == "a":
+            if prompt_choice("[C]ontinue to the next file or [A]bort the "
+                             "program?", "Ca") == "a":
                 raise CatastrophicError("Aborted")
 
     for path in known_files.find_forgotten_files():
@@ -83,6 +86,7 @@ def run(args: Any) -> None:
                     + style_warning(" is no longer known"))
 
     known_files.save_final()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -95,7 +99,8 @@ def main() -> None:
     logging.basicConfig(level=level, style=LOG_STYLE, format=LOG_FORMAT)
 
     if args.export_default_config is not None:
-        logger.info(f"Exporting default config to {style_path(args.export_default_config)}")
+        logger.info("Exporting default config to "
+                    f"{style_path(args.export_default_config)}")
         with open(args.export_default_config, "w") as f:
             f.write(DEFAULT_CONFIG.to_config_file())
         return
@@ -106,6 +111,7 @@ def main() -> None:
         logger.error(e)
     except ConfigurationException as e:
         logger.error(e)
+
 
 if __name__ == "__main__":
     main()

@@ -14,6 +14,7 @@ __all__ = [
     "CatastrophicError", "LessCatastrophicError",
 ]
 
+
 def copy_local_variables(local: Dict[str, Any]) -> Dict[str, Any]:
     """
     Attempts to deep-copy a set of local variables, but keeping
@@ -33,14 +34,18 @@ def copy_local_variables(local: Dict[str, Any]) -> Dict[str, Any]:
 
     return local_copy
 
+
 def get_user() -> str:
     return getpass.getuser()
+
 
 def get_host() -> str:
     return socket.gethostname()
 
+
 class ExecuteException(Exception):
     pass
+
 
 def safer_exec(code: str, local_vars: Dict[str, Any]) -> None:
     """
@@ -52,6 +57,7 @@ def safer_exec(code: str, local_vars: Dict[str, Any]) -> None:
     except Exception as e:
         raise ExecuteException(e)
 
+
 def safer_eval(code: str, local_vars: Dict[str, Any]) -> Any:
     """
     May raise: ExecuteException
@@ -62,8 +68,10 @@ def safer_eval(code: str, local_vars: Dict[str, Any]) -> Any:
     except Exception as e:
         raise ExecuteException(e)
 
+
 class ReadFileException(Exception):
     pass
+
 
 def read_file(path: Path) -> str:
     """
@@ -76,8 +84,10 @@ def read_file(path: Path) -> str:
     except OSError as e:
         raise ReadFileException(e)
 
+
 class WriteFileException(Exception):
     pass
+
 
 def write_file(path: Path, text: str) -> None:
     """
@@ -90,8 +100,10 @@ def write_file(path: Path, text: str) -> None:
     except OSError as e:
         raise WriteFileException(e)
 
+
 class CatastrophicError(Exception):
     pass
+
 
 class LessCatastrophicError(Exception):
     pass
