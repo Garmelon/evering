@@ -23,7 +23,8 @@ class Processor:
 
     def process_file(self,
                      path: Path,
-                     header_path: Optional[Path] = None
+                     header_path: Optional[Path] = None,
+                     dry_run: bool = True
                      ) -> None:
         logger.info(f"{style_path(path)}:")
 
@@ -31,11 +32,15 @@ class Processor:
         config.filename = path.name
 
         if header_path is None:
-            self._process_file_without_header(path, config)
+            self._process_file_without_header(path, config, dry_run)
         else:
-            self._process_file_with_header(path, header_path, config)
+            self._process_file_with_header(path, header_path, config, dry_run)
 
-    def _process_file_without_header(self, path: Path, config: Config) -> None:
+    def _process_file_without_header(self,
+                                     path: Path,
+                                     config: Config,
+                                     dry_run: bool
+                                     ) -> None:
         logger.debug(f"Processing file {style_path(path)} without header")
 
         try:
@@ -54,12 +59,13 @@ class Processor:
                 style_error("Could not parse header of file ") +
                 style_path(path) + f": {e}")
 
-        self._process_parseable(lines, config, path)
+        self._process_parseable(lines, config, path, dry_run)
 
     def _process_file_with_header(self,
                                   path: Path,
                                   header_path: Path,
-                                  config: Config
+                                  config: Config,
+                                  dry_run: bool
                                   ) -> None:
         logger.debug(f"Processing file {style_path(path)} "
                      f"with header {style_path(header_path)}")
@@ -77,7 +83,7 @@ class Processor:
                 style_path(header_path) + f": {e}")
 
         if config.binary:
-            self._process_binary(path, config)
+            self._process_binary(path, config, dry_run)
         else:
             try:
                 lines = read_file(path).splitlines()
@@ -86,9 +92,13 @@ class Processor:
                     style_error("Could not load file ") +
                     style_path(path) + f": {e}")
 
-            self._process_parseable(lines, config, path)
+            self._process_parseable(lines, config, path, dry_run)
 
-    def _process_binary(self, path: Path, config: Config) -> None:
+    def _process_binary(self,
+                        path: Path,
+                        config: Config,
+                        dry_run: bool
+                        ) -> None:
         logger.debug("Processing as a binary file")
 
         if not config.targets:
@@ -100,6 +110,9 @@ class Processor:
 
             if not self._justify_target(target):
                 logger.info("Skipping this target")
+                continue
+
+            if dry_run:
                 continue
 
             try:
@@ -128,7 +141,8 @@ class Processor:
     def _process_parseable(self,
                            lines: List[str],
                            config: Config,
-                           source: Path
+                           source: Path,
+                           dry_run: bool
                            ) -> None:
         if not config.targets:
             logger.info("  (no targets)")
@@ -161,6 +175,9 @@ class Processor:
             except ExecuteException as e:
                 logger.warning(style_warning("Could not compile ") +
                                style_path(target) + f": {e}")
+                continue
+
+            if dry_run:
                 continue
 
             try:

@@ -73,13 +73,17 @@ def run(args: Any) -> None:
 
     for file_info in config_files:
         try:
-            processor.process_file(file_info.path, file_info.header)
+            processor.process_file(file_info.path, file_info.header,
+                                   dry_run=args.dry_run)
         except LessCatastrophicError as e:
             logger.error(e)
 
             if prompt_choice("[C]ontinue to the next file or [A]bort the "
                              "program?", "Ca") == "a":
                 raise CatastrophicError("Aborted")
+
+    if args.dry_run:
+        return
 
     for path in known_files.find_forgotten_files():
         logger.info(style_warning("The file ") + style_path(path)
@@ -92,6 +96,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config-file", type=Path)
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-d", "--dry-run", action="store_true")
     parser.add_argument("--export-default-config", type=Path)
     args = parser.parse_args()
 
